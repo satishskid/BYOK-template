@@ -7,6 +7,9 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 
+// Export User type for use in other components
+export type { User };
+
 // Replace with your Firebase config
 const firebaseConfig = {
   apiKey: "your-api-key",

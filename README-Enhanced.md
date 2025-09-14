@@ -54,7 +54,7 @@ npm install
 ### 2. Firebase Setup
 1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
 2. Enable Google Authentication
-3. Copy your config to `src/services/firebaseService.ts`
+3. Copy your config to `src/firebaseConfig.js`
 
 ### 3. Start Development
 ```bash
@@ -163,6 +163,39 @@ src/
 └── firebaseConfig.js             # 🔥 Firebase configuration
 ```
 
+## 🔧 Configuration Examples
+
+### Adding a New Provider
+```typescript
+// In aiService.ts - Add to PROVIDERS_CONFIG
+newprovider: {
+  name: "New Provider",
+  description: "Description of capabilities",
+  keyPrefix: "np_",
+  testPrompt: "Test prompt",
+  requiresKey: true,
+  setupUrl: "https://newprovider.com",
+  models: [
+    {
+      id: "model-id",
+      name: "Model Name",
+      description: "What this model is good at",
+      strengths: ["Strength 1", "Strength 2"],
+      isDefault: true
+    }
+  ]
+}
+```
+
+### Custom Model Selection
+```typescript
+// Switch provider and model
+setAIConfig('groq', 'your-api-key', 'llama-3.3-70b-versatile');
+
+// Generate with specific provider
+const response = await generateContent("Your prompt");
+```
+
 ## 🚀 Deployment
 
 ### Environment Variables
@@ -234,7 +267,7 @@ const response = await getChatResponse(messages);
 
 ### Provider Management
 ```typescript
-import { setAIConfig } from './services/aiService';
+import { setAIConfig, switchProvider } from './services/aiService';
 
 // Switch to Groq with specific model
 setAIConfig('groq', 'gsk_your_key', 'llama-3.3-70b-versatile');
@@ -265,9 +298,3 @@ MIT License - feel free to use this template in your projects!
 ---
 
 **Ready to build with AI? Clone this template and start creating! 🚀**
-
-## 📋 Quick Links
-
-- **[Quick Start Guide](./QUICK_START.md)** - Get running in 5 minutes
-- **[Enhancement Summary](./ENHANCEMENT_SUMMARY.md)** - What's new in this version
-- **[Original BYOK Boilerplate](./BYOK_BOILERPLATE.md)** - Reference documentation

@@ -1,67 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { testApiKey, setAIConfig, getCurrentProvider, AIProvider } from '../services/aiService';
-
-interface ProviderConfig {
-  name: string;
-  description: string;
-  keyFormat: string;
-  setupGuide: string;
-  website: string;
-}
-
-const PROVIDERS: Record<AIProvider, ProviderConfig> = {
-  gemini: {
-    name: "Google Gemini",
-    description: "Google's most capable AI model with strong reasoning",
-    keyFormat: "AIza...",
-    setupGuide: "1. Go to Google AI Studio\n2. Create a new API key\n3. Copy the key starting with 'AIza'",
-    website: "https://aistudio.google.com"
-  },
-  groq: {
-    name: "Groq",
-    description: "Ultra-fast AI inference with Llama models",
-    keyFormat: "gsk_...", 
-    setupGuide: "1. Go to Groq Console\n2. Create a new API key\n3. Copy the key starting with 'gsk_'",
-    website: "https://console.groq.com"
-  }
-};
+import { 
+  testApiKey, 
+  setAIConfig, 
+  getCurrentProvider, 
+  AIProvider, 
+  getAllProviders,
+  ProviderConfig
+} from '../services/aiService';
 
 const ApiKeyManager: React.FC = () => {
   const [currentProvider, setCurrentProvider] = useState<AIProvider>(getCurrentProvider());
   const [apiKeys, setApiKeys] = useState<Record<AIProvider, string>>({
     gemini: '',
-    groq: ''
+    groq: '',
+    huggingface: '',
+    ollama: '',
+    openrouter: ''
   });
   const [showKeys, setShowKeys] = useState<Record<AIProvider, boolean>>({
     gemini: false,
-    groq: false
+    groq: false,
+    huggingface: false,
+    ollama: false,
+    openrouter: false
   });
   const [testing, setTesting] = useState<Record<AIProvider, boolean>>({
     gemini: false,
-    groq: false
+    groq: false,
+    huggingface: false,
+    ollama: false,
+    openrouter: false
   });
   const [keyStatus, setKeyStatus] = useState<Record<AIProvider, 'valid' | 'invalid' | 'untested'>>({
     gemini: 'untested',
-    groq: 'untested'
+    groq: 'untested',
+    huggingface: 'untested',
+    ollama: 'untested',
+    openrouter: 'untested'
   });
+
+  const providers = getAllProviders();
 
   useEffect(() => {
     // Load existing keys from localStorage
     const savedKeys: Record<AIProvider, string> = {
       gemini: localStorage.getItem('gemini_api_key') || '',
-      groq: localStorage.getItem('groq_api_key') || ''
+      groq: localStorage.getItem('groq_api_key') || '',
+      huggingface: localStorage.getItem('huggingface_api_key') || '',
+      ollama: localStorage.getItem('ollama_api_key') || '',
+      openrouter: localStorage.getItem('openrouter_api_key') || ''
     };
     setApiKeys(savedKeys);
     
     // Test existing keys
     Object.entries(savedKeys).forEach(([provider, key]) => {
-      if (key) {
+      if (key || !providers[provider as AIProvider].requiresKey) {
         testAndSetStatus(provider as AIProvider, key);
       }
     });
-  }, []);
+  }, [providers]);
 
   const testAndSetStatus = async (provider: AIProvider, key: string) => {
+    const config = providers[provider];
+    
+    // For local providers that don't require keys
+    if (!config.requiresKey) {
+      setTesting(prev => ({ ...prev, [provider]: true }));
+      try {
+        const isValid = await testApiKey(provider, '');
+        setKeyStatus(prev => ({ ...prev, [provider]: isValid ? 'valid' : 'invalid' }));
+      } catch (error) {
+        setKeyStatus(prev => ({ ...prev, [provider]: 'invalid' }));
+      } finally {
+        setTesting(prev => ({ ...prev, [provider]: false }));
+      }
+      return;
+    }
+
     if (!key.trim()) {
       setKeyStatus(prev => ({ ...prev, [provider]: 'untested' }));
       return;
@@ -85,6 +100,14 @@ const ApiKeyManager: React.FC = () => {
   };
 
   const handleSaveKey = async (provider: AIProvider) => {
+    const config = providers[provider];
+    
+    // For local providers, just test connection
+    if (!config.requiresKey) {
+      await testAndSetStatus(provider, '');
+      return;
+    }
+
     const key = apiKeys[provider].trim();
     if (key) {
       localStorage.setItem(`${provider}_api_key`, key);
@@ -96,7 +119,10 @@ const ApiKeyManager: React.FC = () => {
   };
 
   const handleSwitchProvider = (provider: AIProvider) => {
-    if (keyStatus[provider] === 'valid') {
+    const config = providers[provider];
+    const isValidProvider = config.requiresKey ? keyStatus[provider] === 'valid' : keyStatus[provider] === 'valid';
+    
+    if (isValidProvider) {
       setAIConfig(provider, apiKeys[provider]);
       setCurrentProvider(provider);
     }
@@ -126,7 +152,7 @@ const ApiKeyManager: React.FC = () => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {(Object.entries(PROVIDERS) as [AIProvider, ProviderConfig][]).map(([provider, config]) => (
+        {(Object.entries(providers) as [AIProvider, ProviderConfig][]).map(([provider, config]) => (
           <div
             key={provider}
             className={`border-2 rounded-lg p-6 transition-all ${
@@ -147,27 +173,29 @@ const ApiKeyManager: React.FC = () => {
             <p className="text-sm text-gray-600 mb-4">{config.description}</p>
 
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  API Key ({config.keyFormat})
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKeys[provider] ? 'text' : 'password'}
-                    value={apiKeys[provider]}
-                    onChange={(e) => handleKeyChange(provider, e.target.value)}
-                    placeholder="Enter your API key"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }))}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showKeys[provider] ? '👁️' : '👁️‍🗨️'}
-                  </button>
+              {config.requiresKey && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    API Key ({config.keyPrefix}...)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showKeys[provider] ? 'text' : 'password'}
+                      value={apiKeys[provider]}
+                      onChange={(e) => handleKeyChange(provider, e.target.value)}
+                      placeholder="Enter your API key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }))}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showKeys[provider] ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <span className={`text-sm font-medium ${getStatusColor(keyStatus[provider])}`}>
@@ -181,10 +209,14 @@ const ApiKeyManager: React.FC = () => {
                   disabled={testing[provider]}
                   className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50"
                 >
-                  {apiKeys[provider] ? 'Save & Test' : 'Remove'}
+                  {config.requiresKey ? 
+                    (apiKeys[provider] ? 'Save & Test' : 'Remove') : 
+                    'Test Connection'
+                  }
                 </button>
                 
-                {keyStatus[provider] === 'valid' && currentProvider !== provider && (
+                {((config.requiresKey && keyStatus[provider] === 'valid') || (!config.requiresKey && keyStatus[provider] === 'valid')) && 
+                 currentProvider !== provider && (
                   <button
                     onClick={() => handleSwitchProvider(provider)}
                     className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors"
@@ -194,20 +226,38 @@ const ApiKeyManager: React.FC = () => {
                 )}
               </div>
 
-              <details className="text-xs text-gray-500">
-                <summary className="cursor-pointer hover:text-gray-700">Setup Guide</summary>
-                <div className="mt-2 p-3 bg-gray-50 rounded">
-                  <div className="whitespace-pre-line">{config.setupGuide}</div>
-                  <a 
-                    href={config.website} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-700 text-sm mt-2 inline-block"
-                  >
-                    Visit {config.name} →
-                  </a>
-                </div>
-              </details>
+              {config.setupUrl && (
+                <details className="text-xs text-gray-500">
+                  <summary className="cursor-pointer hover:text-gray-700">Setup Guide</summary>
+                  <div className="mt-2 p-3 bg-gray-50 rounded">
+                    <div className="space-y-2">
+                      {config.isLocal ? (
+                        <div>
+                          <p className="font-medium">Local Setup:</p>
+                          <p>1. Install {config.name} on your machine</p>
+                          <p>2. Start the local server</p>
+                          <p>3. Make sure it's running on the default port</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="font-medium">API Key Setup:</p>
+                          <p>1. Visit the provider's website</p>
+                          <p>2. Create an account and generate an API key</p>
+                          <p>3. Copy the key starting with '{config.keyPrefix}'</p>
+                        </div>
+                      )}
+                    </div>
+                    <a 
+                      href={config.setupUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:text-blue-700 text-sm mt-2 inline-block"
+                    >
+                      Visit {config.name} →
+                    </a>
+                  </div>
+                </details>
+              )}
             </div>
           </div>
         ))}

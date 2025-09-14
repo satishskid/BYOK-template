@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { User, onAuthStateChange, signInWithGoogle, signOut } from './services/firebaseService';
-import { hasValidApiKey, generateContent } from './services/aiService';
+import { getCurrentProvider, getProviderConfig } from './services/aiService';
 import SettingsView from './components/SettingsView';
 import ApiKeyWarning from './components/ApiKeyWarning';
+import EnhancedApiKeyManager from './components/EnhancedApiKeyManager';
+import AIPlayground from './components/AIPlayground';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [aiResponse, setAiResponse] = useState('');
-  const [testPrompt, setTestPrompt] = useState('Hello, how are you?');
+  const [currentView, setCurrentView] = useState<'playground' | 'setup'>('playground');
+
+  const currentProvider = getCurrentProvider();
+  const providerConfig = getProviderConfig(currentProvider);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange((user) => {
@@ -36,21 +40,6 @@ function App() {
     }
   };
 
-  const testAI = async () => {
-    if (!hasValidApiKey()) {
-      setShowSettings(true);
-      return;
-    }
-
-    try {
-      setAiResponse('Generating...');
-      const response = await generateContent(testPrompt);
-      setAiResponse(response);
-    } catch (error: any) {
-      setAiResponse(`Error: ${error.message}`);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,8 +53,8 @@ function App() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900">Welcome to BYOK AI</h2>
-            <p className="mt-2 text-gray-600">Sign in to get started with AI features</p>
+            <h2 className="text-3xl font-bold text-gray-900">🔑 Enhanced BYOK AI</h2>
+            <p className="mt-2 text-gray-600">Multi-provider AI with local and cloud models</p>
           </div>
           <button
             onClick={handleSignIn}
@@ -83,8 +72,35 @@ function App() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            <h1 className="text-2xl font-bold text-gray-900">BYOK AI App</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">🚀 Enhanced BYOK AI</h1>
+              <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                {providerConfig.name}
+              </span>
+            </div>
             <div className="flex items-center space-x-4">
+              <nav className="flex space-x-4">
+                <button
+                  onClick={() => setCurrentView('playground')}
+                  className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                    currentView === 'playground' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  🤖 Playground
+                </button>
+                <button
+                  onClick={() => setCurrentView('setup')}
+                  className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                    currentView === 'setup' 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  ⚙️ Setup
+                </button>
+              </nav>
               <span className="text-sm text-gray-600">
                 {user.displayName || user.email}
               </span>
@@ -106,44 +122,20 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <ApiKeyWarning 
           onOpenSettings={() => setShowSettings(true)}
           className="mb-6"
         />
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">AI Test</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Test Prompt
-              </label>
-              <textarea
-                value={testPrompt}
-                onChange={(e) => setTestPrompt(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows={3}
-              />
+        {currentView === 'playground' && <AIPlayground />}
+        {currentView === 'setup' && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <EnhancedApiKeyManager />
             </div>
-
-            <button
-              onClick={testAI}
-              disabled={!hasValidApiKey()}
-              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Test AI
-            </button>
-
-            {aiResponse && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                <h3 className="font-medium text-gray-900 mb-2">AI Response:</h3>
-                <p className="text-gray-700 whitespace-pre-wrap">{aiResponse}</p>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </main>
 
       <SettingsView 
