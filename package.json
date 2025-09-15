@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "setup": "./setup.sh"
+    "setup:firebase": "node cli/setup.js firebase",
+    "setup:admin": "node cli/setup.js admin",
+    "setup": "node cli/setup.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

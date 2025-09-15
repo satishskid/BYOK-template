@@ -23,9 +23,10 @@ export interface ProviderConfig {
   models: ModelConfig[];
   setupUrl?: string;
   isLocal?: boolean;
+  setupInstructions: string[];
 }
 
-// Enhanced provider configuration with multiple models
+// Enhanced provider configuration with multiple models and setup instructions
 const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: "Google Gemini",
@@ -34,6 +35,13 @@ const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
     testPrompt: "Respond with exactly 'test successful' if you can process this.",
     requiresKey: true,
     setupUrl: "https://aistudio.google.com",
+    setupInstructions: [
+      "Visit https://aistudio.google.com",
+      "Sign in with your Google account",
+      "Click 'Get API key' in the left sidebar",
+      "Create a new API key (starts with 'AIza')",
+      "Copy the key and paste it below"
+    ],
     models: [
       {
         id: "gemini-2.0-flash-exp",
@@ -66,6 +74,13 @@ const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
     testPrompt: "Respond with exactly 'test successful' if you can process this.",
     requiresKey: true,
     setupUrl: "https://console.groq.com",
+    setupInstructions: [
+      "Visit https://console.groq.com",
+      "Sign up for a free account",
+      "Go to API Keys section",
+      "Create a new API key (starts with 'gsk_')",
+      "Copy the key and paste it below"
+    ],
     models: [
       {
         id: "llama-3.3-70b-versatile",
@@ -105,6 +120,13 @@ const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
     testPrompt: "Respond with exactly 'test successful' if you can process this.",
     requiresKey: true,
     setupUrl: "https://huggingface.co/settings/tokens",
+    setupInstructions: [
+      "Visit https://huggingface.co/settings/tokens",
+      "Sign in with your Hugging Face account",
+      "Click 'New token' to create a new API token",
+      "Give your token a name and select 'Read' scope",
+      "Copy the token (starts with 'hf_') and paste it below"
+    ],
     models: [
       {
         id: "meta-llama/Llama-3.2-3B-Instruct",
@@ -138,6 +160,13 @@ const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
     requiresKey: false,
     isLocal: true,
     setupUrl: "https://ollama.ai",
+    setupInstructions: [
+      "Visit https://ollama.ai to download Ollama",
+      "Install Ollama on your system",
+      "Run 'ollama run llama3.2' to download and start the default model",
+      "Ollama will run on http://localhost:11434",
+      "No API key required - just select this provider"
+    ],
     models: [
       {
         id: "llama3.2",
@@ -173,6 +202,13 @@ const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
     testPrompt: "Respond with exactly 'test successful' if you can process this.",
     requiresKey: true,
     setupUrl: "https://openrouter.ai",
+    setupInstructions: [
+      "Visit https://openrouter.ai",
+      "Sign up for an account",
+      "Go to Keys section in your dashboard",
+      "Create a new API key (starts with 'sk-or-')",
+      "Copy the key and paste it below"
+    ],
     models: [
       {
         id: "google/gemini-flash-1.5",
@@ -198,14 +234,14 @@ const PROVIDERS_CONFIG: Record<AIProvider, ProviderConfig> = {
 };
 
 // Local Storage Management
-function getAIProvider(): AIProvider {
+export function getAIProvider(): AIProvider {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('ai_provider') as AIProvider || 'gemini';
   }
   return 'gemini';
 }
 
-function getSelectedModel(provider: AIProvider): string {
+export function getSelectedModel(provider: AIProvider): string {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem(`${provider}_selected_model`);
     if (saved) return saved;
@@ -215,7 +251,7 @@ function getSelectedModel(provider: AIProvider): string {
   return defaultModel?.id || PROVIDERS_CONFIG[provider].models[0]?.id || '';
 }
 
-function getUserApiKey(provider?: AIProvider): string | null {
+export function getUserApiKey(provider?: AIProvider): string | null {
   if (typeof window !== 'undefined') {
     const currentProvider = provider || getAIProvider();
     return localStorage.getItem(`${currentProvider}_api_key`);
@@ -379,7 +415,30 @@ export function hasValidApiKey(): boolean {
   }
   
   const userKey = getUserApiKey(provider);
-  return !!userKey;
+  return !!userKey && userKey.startsWith(config.keyPrefix);
+}
+
+export function getApiKeyConfigMessage(): string {
+  const provider = getAIProvider();
+  const config = PROVIDERS_CONFIG[provider];
+  
+  if (config.requiresKey) {
+    return `🔑 API Configuration Required
+
+To use ${config.name}, please:
+1. Click Settings ⚙️ in the top-right
+2. Choose ${config.name} as your provider
+3. Add your API key from ${config.setupUrl}
+4. Save and return to start chatting
+
+This BYOK (Bring Your Own Key) approach ensures your privacy and gives you control over AI costs.`;
+  }
+  
+  return `✅ ${config.name} is ready to use! No API key required.`;
+}
+
+export function getProviderSetupInstructions(provider: AIProvider): string[] {
+  return PROVIDERS_CONFIG[provider].setupInstructions;
 }
 
 export function getCurrentProvider(): AIProvider {
@@ -400,11 +459,14 @@ export async function generateContent(prompt: string): Promise<string> {
   const provider = getAIProvider();
   const config = PROVIDERS_CONFIG[provider];
   
-  // Check if API key is required
+  // Enhanced validation for API key
   if (config.requiresKey) {
     const apiKey = getUserApiKey(provider);
     if (!apiKey) {
-      throw new Error("API Key not configured. Please set up your API key in settings.");
+      throw new Error(`API Key not configured for ${config.name}. Please set up your API key in settings.`);
+    }
+    if (!apiKey.startsWith(config.keyPrefix)) {
+      throw new Error(`Invalid API key format for ${config.name}. Please check your API key starts with '${config.keyPrefix}'.`);
     }
   }
   
@@ -526,11 +588,14 @@ export async function getChatResponse(messages: Array<{role: string, content: st
   const config = PROVIDERS_CONFIG[provider];
   const modelId = getSelectedModel(provider);
   
-  // Check if API key is required
+  // Enhanced validation for API key
   if (config.requiresKey) {
     const apiKey = getUserApiKey(provider);
     if (!apiKey) {
-      throw new Error("API Key not configured");
+      throw new Error(`API Key not configured for ${config.name}. Please set up your API key in settings.`);
+    }
+    if (!apiKey.startsWith(config.keyPrefix)) {
+      throw new Error(`Invalid API key format for ${config.name}. Please check your API key starts with '${config.keyPrefix}'.`);
     }
   }
   

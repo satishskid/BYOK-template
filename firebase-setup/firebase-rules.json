@@ -1,0 +1,90 @@
+{
+  "rules_version": "2",
+  "firestore_rules": {
+    "service": "cloud.firestore",
+    "match": {
+      "databases": {
+        "{database}": {
+          "documents": {
+            "whitelist": {
+              "config": {
+                "read": "request.auth != null && request.auth.token.email_verified == true",
+                "write": "request.auth != null && request.auth.token.admin == true",
+                "validate": {
+                  "required": ["apiKey", "authDomain", "projectId"],
+                  "apiKey": "request.resource.data.apiKey is string && request.resource.data.apiKey.size() > 0",
+                  "authDomain": "request.resource.data.authDomain is string && request.resource.data.authDomain.matches('.*\\.firebaseapp\\.com$')",
+                  "projectId": "request.resource.data.projectId is string && request.resource.data.projectId.size() > 0"
+                }
+              },
+              "users": {
+                "{userId}": {
+                  "read": "request.auth != null && request.auth.uid == userId",
+                  "write": "request.auth != null && request.auth.token.admin == true",
+                  "validate": {
+                    "required": ["email", "isWhitelisted", "createdAt"],
+                    "email": "request.resource.data.email is string && request.resource.data.email.matches('.*@.*\\..*')",
+                    "isWhitelisted": "request.resource.data.isWhitelisted is bool",
+                    "createdAt": "request.resource.data.createdAt is timestamp"
+                  }
+                }
+              }
+            },
+            "admins": {
+              "{adminId}": {
+                "read": "request.auth != null && request.auth.token.admin == true",
+                "write": "request.auth != null && request.auth.token.admin == true",
+                "validate": {
+                  "required": ["email", "role", "createdAt"],
+                  "email": "request.resource.data.email is string && request.resource.data.email.matches('.*@.*\\..*')",
+                  "role": "request.resource.data.role in ['admin', 'super_admin']",
+                  "createdAt": "request.resource.data.createdAt is timestamp"
+                }
+              }
+            },
+            "whitelist_requests": {
+              "{requestId}": {
+                "create": "request.auth != null",
+                "read": "request.auth != null && (request.auth.uid == resource.data.userId || request.auth.token.admin == true)",
+                "update": "request.auth != null && request.auth.token.admin == true",
+                "validate": {
+                  "required": ["email", "status", "requestedAt", "userId"],
+                  "email": "request.resource.data.email is string && request.resource.data.email.matches('.*@.*\\..*')",
+                  "status": "request.resource.data.status in ['pending', 'approved', 'rejected']",
+                  "requestedAt": "request.resource.data.requestedAt is timestamp",
+                  "userId": "request.resource.data.userId is string && request.resource.data.userId.size() > 0"
+                }
+              }
+            },
+            "usage_stats": {
+              "{statId}": {
+                "read": "request.auth != null && request.auth.token.admin == true",
+                "write": "request.auth != null && request.auth.token.admin == true",
+                "validate": {
+                  "required": ["userId", "action", "timestamp", "metadata"],
+                  "userId": "request.resource.data.userId is string",
+                  "action": "request.resource.data.action in ['login', 'api_call', 'whitelist_check']",
+                  "timestamp": "request.resource.data.timestamp is timestamp",
+                  "metadata": "request.resource.data.metadata is map"
+                }
+              }
+            },
+            "users": {
+              "{userId}": {
+                "read": "request.auth != null && request.auth.uid == userId",
+                "write": "request.auth != null && request.auth.uid == userId",
+                "validate": {
+                  "required": ["email", "displayName", "createdAt", "lastLoginAt"],
+                  "email": "request.resource.data.email is string && request.resource.data.email.matches('.*@.*\\..*')",
+                  "displayName": "request.resource.data.displayName is string && request.resource.data.displayName.size() > 0",
+                  "createdAt": "request.resource.data.createdAt is timestamp",
+                  "lastLoginAt": "request.resource.data.lastLoginAt is timestamp"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
